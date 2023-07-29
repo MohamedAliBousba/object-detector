@@ -48,7 +48,16 @@ const SelectButton = styled.button`
   }
 `;
 
-const TargetBox = styled.div`
+type TargetBoxProps = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  classType: string;
+  score: number;
+};
+
+const TargetBox = styled.div<TargetBoxProps>`
   position: absolute;
   left: ${({ x }) => x + "px"};
   top: ${({ y }) => y + "px"};
@@ -69,10 +78,16 @@ const TargetBox = styled.div`
 `;
 
 const ObjectDetector = () => {
-  const fileInputRef = useRef();
-  const imageRef = useRef();
-  const [imgData, setImgData] = useState(null);
-  const [predictions, setPredictions] = useState([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [imgData, setImgData] = useState<string>("");
+  const [predictions, setPredictions] = useState<
+    {
+      bbox: number[];
+      class: string;
+      score: number;
+    }[]
+  >([]);
   const [isLoading, setLoading] = useState(false);
 
   const isEmptyPredictions = !predictions || predictions.length === 0;
@@ -81,11 +96,14 @@ const ObjectDetector = () => {
     if (fileInputRef.current) fileInputRef.current.click();
   };
 
-  const normalizePredictions = (predictions, imgSize) => {
+  const normalizePredictions = (
+    predictions: cocoSsd.DetectedObject[],
+    imgSize: { width: number; height: number }
+  ) => {
     if (!predictions || !imgSize || !imageRef) return predictions || [];
-    return predictions.map(prediction => {
-      const imgWidth = imageRef.current.width;
-      const imgHeight = imageRef.current.height;
+    return predictions.map((prediction) => {
+      const imgWidth = imageRef.current?.width || 150;
+      const imgHeight = imageRef.current?.height || 500;
 
       const x = (prediction.bbox[0] * imgWidth) / imgSize.width;
       const y = (prediction.bbox[1] * imgHeight) / imgSize.height;
@@ -96,17 +114,21 @@ const ObjectDetector = () => {
     });
   };
 
-  const detectObjectsOnImage = async (imageElement, imgSize) => {
+  const detectObjectsOnImage = async (
+    imageElement: HTMLImageElement,
+    imgSize: { width: number; height: number }
+  ) => {
     const model = await cocoSsd.load({});
     const predictions = await model.detect(imageElement, 6);
     const normalizedPredictions = normalizePredictions(predictions, imgSize);
     setPredictions(normalizedPredictions);
   };
 
-  const onSelectImage = async e => {
+  const onSelectImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setPredictions([]);
-    setLoading(true);
+    if (!e.target.files) return;
 
+    setLoading(true);
     const file = e.target.files[0];
     const imgData = URL.createObjectURL(file);
     setImgData(imgData);
@@ -117,7 +139,7 @@ const ObjectDetector = () => {
     imageElement.onload = async () => {
       const imgSize = {
         width: imageElement.width,
-        height: imageElement.height
+        height: imageElement.height,
       };
       await detectObjectsOnImage(imageElement, imgSize);
       setLoading(false);
